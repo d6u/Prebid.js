@@ -26,6 +26,7 @@ var AUCTION_END = CONSTANTS.EVENTS.AUCTION_END;
 
 var pb_bidsTimedOut = false;
 var auctionRunning = false;
+var bidRequestQueue = [];
 var presetTargeting = [];
 var pbTargetingKeys = [];
 
@@ -375,7 +376,7 @@ $$PREBID_GLOBAL$$.setTargetingForGPTAsync = function () {
     utils.logError('window.googletag is not defined on the page');
     return;
   }
-  
+
   //first reset any old targeting
   getPresetTargeting();
   resetPresetTargeting();
@@ -471,6 +472,9 @@ $$PREBID_GLOBAL$$.clearAuction = function() {
   auctionRunning = false;
   utils.logMessage('Prebid auction cleared');
   events.emit(AUCTION_END);
+  if (bidRequestQueue.length) {
+    bidRequestQueue.shift()();
+  }
 };
 
 /**
@@ -482,8 +486,7 @@ $$PREBID_GLOBAL$$.clearAuction = function() {
  */
 $$PREBID_GLOBAL$$.requestBids = function ({ bidsBackHandler, timeout, adUnits, adUnitCodes }) {
   if (auctionRunning) {
-    utils.logError('Prebid Error: `$$PREBID_GLOBAL$$.requestBids` was called while a previous auction was' +
-      ' still running. Resubmit this request.');
+    bidRequestQueue.push(() => $$PREBID_GLOBAL$$.requestBids(...arguments));
     return;
   } else {
     auctionRunning = true;
